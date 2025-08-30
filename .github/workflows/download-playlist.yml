@@ -1,0 +1,124 @@
+name: Download Spotify Playlist
+
+on:
+  workflow_dispatch:
+    inputs:
+      spotify_url:
+        description: 'URL de la playlist de Spotify'
+        required: true
+        type: string
+      quality:
+        description: 'Calidad de audio (128, 192, 320)'
+        required: true
+        default: '320'
+        type: choice
+        options:
+        - '128'
+        - '192'
+        - '320'
+      user_email:
+        description: 'Email del usuario (opcional)'
+        required: false
+        type: string
+
+jobs:
+  download-playlist:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install spotdl requests
+        
+    - name: Create download directory
+      run: |
+        mkdir -p downloads
+        mkdir -p temp_music
+        
+    - name: Download playlist
+      id: download
+      run: |
+        echo "🎵 Descargando playlist: ${{ github.event.inputs.spotify_url }}"
+        echo "📊 Calidad: ${{ github.event.inputs.quality }} kbps"
+        
+        # Configurar spotdl
+        spotdl --version
+        
+        # Descargar playlist
+        cd temp_music
+        spotdl "${{ github.event.inputs.spotify_url }}" \
+          --output "{artist} - {title}.mp3" \
+          --quality "${{ github.event.inputs.quality }}"
+        
+        # Contar archivos descargados
+        MP3_COUNT=$(find . -name "*.mp3" | wc -l)
+        echo "mp3_count=$MP3_COUNT" >> $GITHUB_OUTPUT
+        
+        if [ $MP3_COUNT -eq 0 ]; then
+          echo "❌ No se descargaron archivos MP3"
+          exit 1
+        fi
+        
+        echo "✅ Se descargaron $MP3_COUNT canciones"
+        
+    - name: Create ZIP file
+      run: |
+        cd temp_music
+        
+        # Obtener nombre de la playlist desde la URL
+        PLAYLIST_ID=$(echo "${{ github.event.inputs.spotify_url }}" | grep -o '[a-zA-Z0-9]\{22\}' | head -1)
+        PLAYLIST_NAME="playlist_${PLAYLIST_ID}_${{ github.event.inputs.quality }}kbps"
+        
+        # Crear ZIP con timestamp
+        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+        ZIP_NAME="${PLAYLIST_NAME}_${TIMESTAMP}.zip"
+        
+        # Crear ZIP
+        zip -r "../downloads/${ZIP_NAME}" . -x "*.tmp" "*.log"
+        
+        # Guardar nombre del ZIP para el siguiente paso
+        echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_ENV
+        
+        echo "📦 ZIP creado: ${ZIP_NAME}"
+        
+    - name: Upload ZIP as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: playlist-zip
+        path: downloads/${{ env.ZIP_NAME }}
+        retention-days: 1
+        
+    - name: Clean up temporary files
+      run: |
+        rm -rf temp_music
+        rm -rf downloads
+        
+    - name: Create summary
+      run: |
+        echo "## 🎵 Playlist Descargada" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **URL:** ${{ github.event.inputs.spotify_url }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Calidad:** ${{ github.event.inputs.quality }} kbps" >> $GITHUB_STEP_SUMMARY
+        echo "- **Canciones:** ${{ steps.download.outputs.mp3_count }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Archivo:** ${{ env.ZIP_NAME }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tiempo:** $(date)" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Success message
+      run: |
+        echo "✅ Playlist descargada exitosamente!"
+        echo "📦 Archivo ZIP: ${{ env.ZIP_NAME }}"
+        echo "🎵 Canciones: ${{ steps.download.outputs.mp3_count }}"
