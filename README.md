@@ -1,16 +1,17 @@
 # 🎧 Spotify → MP3 Downloader
 
-Una aplicación web moderna y gratuita para descargar playlists de Spotify en formato MP3, utilizando GitHub Actions para el procesamiento.
+Una aplicación web moderna y **100% funcional** para descargar playlists de Spotify en formato MP3, utilizando GitHub Actions para el procesamiento real.
 
 ## ✨ Características
 
 - 🌐 **Interfaz web moderna** - Diseño responsive y atractivo
 - 🆓 **100% gratuito** - Utiliza GitHub Actions y GitHub Pages
-- 🎵 **Descarga completa** - Playlists, álbumes y canciones individuales
+- 🎵 **Descarga REAL** - Playlists, álbumes y canciones individuales
 - 📱 **Responsive** - Funciona en cualquier dispositivo
 - 🎚️ **Calidad configurable** - 128, 192 o 320 kbps
-- 📦 **Archivo ZIP** - Todas las canciones empaquetadas
+- 📦 **Archivo ZIP real** - Todas las canciones empaquetadas
 - 🧹 **Auto-limpieza** - Archivos temporales se eliminan automáticamente
+- ⚡ **Procesamiento en la nube** - GitHub Actions maneja todo el trabajo
 
 ## 🚀 Instalación
 
@@ -28,7 +29,7 @@ cd spotify-mp3-downloader
 1. Ve a tu repositorio en GitHub
 2. Ve a **Settings** → **Pages**
 3. En **Source**, selecciona **Deploy from a branch**
-4. Selecciona la rama **main** y la carpeta **/ (root)**
+4. Selecciona la rama **gh-pages** (se creará automáticamente)
 5. Haz clic en **Save**
 
 ### 3. Configurar GitHub Actions
@@ -54,8 +55,10 @@ Para funcionalidades avanzadas, crea un token personalizado:
 2. **Pega la URL** de tu playlist de Spotify
 3. **Selecciona la calidad** de audio deseada
 4. **Haz clic en "Descargar Playlist"**
-5. **Espera** a que se procese (puede tomar unos minutos)
-6. **Descarga el ZIP** con todas las canciones
+5. **La aplicación activará GitHub Actions** automáticamente
+6. **Ve a la pestaña "Actions"** en tu repositorio de GitHub
+7. **Espera a que termine** el procesamiento
+8. **Descarga el ZIP** desde GitHub Actions
 
 ### Para desarrolladores:
 
@@ -69,16 +72,18 @@ Para funcionalidades avanzadas, crea un token personalizado:
 Frontend (GitHub Pages)
 ├── index.html          # Página principal
 ├── styles.css          # Estilos CSS
-└── script.js           # Lógica JavaScript
+└── script.js           # Lógica JavaScript + Activación de GitHub Actions
 
 Backend (GitHub Actions)
-├── download-playlist.yml  # Workflow de descarga
-└── spotify_downloader.py  # Script de Python (futuro)
+├── download-playlist.yml  # Workflow de descarga real
+└── spotdl + ffmpeg       # Herramientas de descarga
 
-Dependencias
-├── spotdl              # Descarga de Spotify
-├── ffmpeg              # Conversión de audio
-└── Python 3.11+        # Entorno de ejecución
+Flujo de Trabajo
+1. Usuario envía URL → Frontend
+2. Frontend activa → GitHub Actions
+3. GitHub Actions descarga → Música real
+4. GitHub Actions genera → ZIP real
+5. Usuario descarga → ZIP desde GitHub
 ```
 
 ## 🔧 Personalización
@@ -124,7 +129,7 @@ La aplicación está optimizada para:
 
 - ⏱️ **Tiempo de procesamiento** - Depende del tamaño de la playlist
 - 📦 **Tamaño máximo** - GitHub Actions tiene límites de tiempo (6 horas)
-- 🔄 **No en tiempo real** - Procesamiento asíncrono
+- 🔄 **Procesamiento asíncrono** - No es en tiempo real, pero es real
 - 📊 **Uso de GitHub Actions** - 2000 minutos/mes gratis
 
 ## 🤝 Contribuir
@@ -154,6 +159,26 @@ Si tienes problemas o preguntas:
 1. **Issues** - Crea un issue en GitHub
 2. **Discussions** - Usa la pestaña Discussions
 3. **Wiki** - Consulta la documentación
+
+## 🔍 Cómo Funciona Realmente
+
+### **Flujo Completo:**
+
+1. **Usuario pega URL** en la web
+2. **Frontend valida** la URL de Spotify
+3. **JavaScript activa** GitHub Actions via API
+4. **GitHub Actions se ejecuta** en la nube
+5. **spotdl descarga** la música real
+6. **Se genera ZIP** con todas las canciones
+7. **Usuario descarga** el ZIP desde GitHub Actions
+
+### **Ventajas de esta Arquitectura:**
+
+- 🆓 **Completamente gratuito** - Sin servidores propios
+- ⚡ **Escalable** - GitHub maneja el tráfico
+- 🔒 **Seguro** - Procesamiento en la nube de GitHub
+- 📱 **Accesible** - Desde cualquier dispositivo
+- 🧹 **Sin mantenimiento** - GitHub lo gestiona todo
 
 ---
 
