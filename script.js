@@ -13,13 +13,9 @@ class SpotifyDownloader {
         this.downloadLink = document.getElementById('downloadLink');
         this.errorText = document.getElementById('errorText');
         
-        this.startTime = null;
-        this.estimatedDuration = 0;
-        this.progressInterval = null;
-        this.workflowRunId = null;
-        
         this.setupEventListeners();
         this.checkUrl();
+        this.checkSpotDLStatus();
     }
 
     setupEventListeners() {
@@ -43,6 +39,37 @@ class SpotifyDownloader {
         return spotifyRegex.test(url);
     }
 
+    async checkSpotDLStatus() {
+        try {
+            const response = await fetch('/api/check-spotdl');
+            const data = await response.json();
+            
+            if (!data.installed) {
+                this.showSpotDLError(data.error);
+            }
+        } catch (error) {
+            console.error('Error verificando SpotDL:', error);
+        }
+    }
+
+    showSpotDLError(message) {
+        const errorHtml = `
+            <div class="alert alert-warning">
+                <h6><i class="fas fa-exclamation-triangle me-2"></i>SpotDL no está instalado</h6>
+                <p>Para que la aplicación funcione, necesitas instalar SpotDL:</p>
+                <div class="bg-dark text-light p-3 rounded">
+                    <code>pip install spotdl</code>
+                </div>
+                <p class="mt-2 mb-0">
+                    <strong>Alternativa:</strong> Ejecuta <code>npm run install-all</code> en la terminal
+                </p>
+            </div>
+        `;
+        
+        // Insertar después del formulario
+        this.form.insertAdjacentHTML('afterend', errorHtml);
+    }
+
     async handleSubmit(e) {
         e.preventDefault();
         
@@ -60,23 +87,42 @@ class SpotifyDownloader {
     async startDownload(spotifyUrl, quality) {
         try {
             this.showProgress();
-            this.startTime = Date.now();
+            this.updateStatus('Iniciando descarga con SpotDL...', 10);
             
-            // Estimar duración basada en la calidad
-            this.estimatedDuration = this.estimateDownloadTime(quality);
+            // Extraer información de la URL
+            const spotifyInfo = this.extractSpotifyInfo(spotifyUrl);
             
-            this.updateStatus('Iniciando descarga en GitHub Actions...', 10);
+            this.updateStatus('Conectando con servidor local...', 20);
             
-            // Activar GitHub Actions real
-            const success = await this.triggerGitHubAction(spotifyUrl, quality);
+            // Enviar solicitud al servidor local
+            const response = await fetch('/api/download-playlist', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    spotifyUrl: spotifyUrl,
+                    quality: quality
+                })
+            });
             
-            if (success) {
-                this.updateStatus('Workflow iniciado en GitHub Actions', 30);
-                this.startRealisticProgress();
-                await this.processDownload(spotifyUrl, quality);
-            } else {
-                throw new Error('No se pudo iniciar el workflow de GitHub Actions');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Error en el servidor');
             }
+            
+            this.updateStatus('Descargando música real de YouTube...', 50);
+            
+            // Simular progreso mientras SpotDL descarga
+            this.simulateProgress();
+            
+            // Esperar a que se complete la descarga
+            await this.waitForDownload(response);
+            
+            this.updateStatus('Descarga completada', 100);
+            
+            // Mostrar enlace de descarga
+            this.showDownloadReady();
             
         } catch (error) {
             console.error('Error en la descarga:', error);
@@ -84,135 +130,51 @@ class SpotifyDownloader {
         }
     }
 
-    async triggerGitHubAction(spotifyUrl, quality) {
+    extractSpotifyInfo(spotifyUrl) {
         try {
-            // URL del workflow de GitHub Actions
-            const workflowUrl = `https://api.github.com/repos/aleesaez0/spotify-mp3-downloader/actions/workflows/download-playlist.yml/dispatches`;
+            const urlParts = spotifyUrl.split('/');
+            const type = urlParts[urlParts.length - 2];
+            const id = urlParts[urlParts.length - 1].split('?')[0];
             
-            // Datos para el workflow
-            const workflowData = {
-                ref: 'main',
-                inputs: {
-                    spotify_url: spotifyUrl,
-                    quality: quality
-                }
+            return {
+                name: `Playlist_${id}`,
+                type: type,
+                id: id
             };
-            
-            // Nota: Para que esto funcione, necesitas un token de GitHub con permisos de repo
-            // Por ahora, simulamos la activación exitosa
-            console.log('Activando GitHub Actions con:', workflowData);
-            
-            // Simular activación exitosa (en producción necesitarías el token real)
-            await this.delay(2000);
-            
-            // Mostrar instrucciones para el usuario
-            this.showGitHubInstructions(spotifyUrl, quality);
-            
-            return true;
-            
         } catch (error) {
-            console.error('Error al activar GitHub Actions:', error);
-            return false;
+            throw new Error('No se pudo analizar la URL de Spotify');
         }
     }
 
-    showGitHubInstructions(spotifyUrl, quality) {
-        this.hideAll();
-        
-        // Crear mensaje con instrucciones
-        const instructionsHtml = `
-            <div class="alert alert-info">
-                <h5><i class="fas fa-info-circle me-2"></i>Workflow Activado en GitHub</h5>
-                <p><strong>URL:</strong> ${spotifyUrl}</p>
-                <p><strong>Calidad:</strong> ${quality} kbps</p>
-                <hr>
-                <p><strong>Para completar la descarga:</strong></p>
-                <ol class="mb-3">
-                    <li>Ve a tu repositorio en GitHub</li>
-                    <li>Haz clic en la pestaña "Actions"</li>
-                    <li>Busca el workflow "Download Spotify Playlist"</li>
-                    <li>Haz clic en el workflow en ejecución</li>
-                    <li>Espera a que termine y descarga el ZIP</li>
-                </ol>
-                <a href="https://github.com/aleesaez0/spotify-mp3-downloader/actions" 
-                   target="_blank" class="btn btn-primary">
-                    <i class="fab fa-github me-2"></i>Ver en GitHub Actions
-                </a>
-            </div>
-        `;
-        
-        // Insertar las instrucciones
-        this.progressContainer.innerHTML = instructionsHtml;
-        this.progressContainer.style.display = 'block';
-        this.form.classList.remove('loading');
-    }
-
-    estimateDownloadTime(quality) {
-        const baseTime = 30000;
-        switch(quality) {
-            case '320': return baseTime * 1.5;
-            case '192': return baseTime * 1.2;
-            case '128': return baseTime;
-            default: return baseTime;
-        }
-    }
-
-    startRealisticProgress() {
-        let progress = 30;
-        const targetProgress = 90;
-        
-        this.progressInterval = setInterval(() => {
-            if (progress < targetProgress) {
-                const remaining = targetProgress - progress;
-                const increment = Math.max(0.5, remaining * 0.1);
-                progress += increment;
-                
-                this.updateStatusWithTime('Procesando en GitHub Actions...', progress);
+    simulateProgress() {
+        let progress = 50;
+        const interval = setInterval(() => {
+            if (progress < 90) {
+                progress += Math.random() * 5;
+                this.updateStatus('Descargando música real de YouTube...', progress);
             } else {
-                clearInterval(this.progressInterval);
+                clearInterval(interval);
             }
         }, 1000);
     }
 
-    updateStatusWithTime(message, percentage) {
-        this.updateStatus(message, percentage);
+    async waitForDownload(response) {
+        // Crear un blob del response para descarga
+        const blob = await response.blob();
         
-        if (this.startTime && this.estimatedDuration > 0) {
-            const elapsed = Date.now() - this.startTime;
-            const remaining = Math.max(0, this.estimatedDuration - elapsed);
-            const remainingSeconds = Math.ceil(remaining / 1000);
-            
-            if (remainingSeconds > 0) {
-                this.statusText.textContent = `${message} - Tiempo restante: ${this.formatTime(remainingSeconds)}`;
-            }
-        }
-    }
-
-    formatTime(seconds) {
-        if (seconds < 60) {
-            return `${seconds}s`;
-        } else {
-            const minutes = Math.floor(seconds / 60);
-            const remainingSeconds = seconds % 60;
-            return `${minutes}m ${remainingSeconds}s`;
-        }
-    }
-
-    async processDownload(spotifyUrl, quality) {
-        await this.delay(2000);
-        this.updateStatusWithTime('Descargando playlist...', 30);
+        // Crear URL del blob
+        const downloadUrl = URL.createObjectURL(blob);
         
-        await this.delay(2000);
-        this.updateStatusWithTime('Procesando canciones...', 60);
+        // Configurar enlace de descarga
+        this.downloadLink.href = downloadUrl;
+        this.downloadLink.download = 'playlist_music.zip';
         
-        await this.delay(2000);
-        this.updateStatusWithTime('Generando archivo ZIP...', 80);
-        
-        await this.delay(1000);
-        this.updateStatus('Completado en GitHub Actions', 100);
-        
-        await this.delay(500);
-        this.showDownloadReady('playlist_download.zip');
+        // Limpiar URL cuando se complete
+        this.downloadLink.addEventListener('click', () => {
+            setTimeout(() => {
+                URL.revokeObjectURL(downloadUrl);
+            }, 1000);
+        });
     }
 
     updateStatus(message, percentage) {
@@ -239,33 +201,12 @@ class SpotifyDownloader {
         this.progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated bg-warning';
     }
 
-    showDownloadReady(filename) {
+    showDownloadReady() {
         this.hideAll();
         this.downloadContainer.style.display = 'block';
         this.form.classList.remove('loading');
         
-        if (this.progressInterval) {
-            clearInterval(this.progressInterval);
-        }
-        
-        this.downloadLink.href = `#${filename}`;
-        this.downloadLink.download = filename;
-        
-        this.downloadLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.simulateDownload(filename);
-        });
-    }
-
-    simulateDownload(filename) {
-        this.downloadLink.textContent = 'Descargando...';
-        this.downloadLink.disabled = true;
-        
-        setTimeout(() => {
-            this.downloadLink.textContent = '¡Descargado!';
-            this.downloadLink.classList.add('btn-secondary');
-            this.downloadLink.classList.remove('btn-success');
-        }, 2000);
+        // El enlace ya está configurado en waitForDownload
     }
 
     showError(message) {
@@ -273,20 +214,12 @@ class SpotifyDownloader {
         this.errorContainer.style.display = 'block';
         this.errorText.textContent = message;
         this.form.classList.remove('loading');
-        
-        if (this.progressInterval) {
-            clearInterval(this.progressInterval);
-        }
     }
 
     hideAll() {
         this.progressContainer.style.display = 'none';
         this.downloadContainer.style.display = 'none';
         this.errorContainer.style.display = 'none';
-    }
-
-    delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
 
